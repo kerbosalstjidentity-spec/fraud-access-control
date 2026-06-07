@@ -1,0 +1,14 @@
+# 후속(보안) 프로젝트 단독 실행 — 가장 가벼움.
+#   docker compose up --build      → http://localhost:8030
+# 기존 PayWise(8010/8020/3020 등)와 포트가 겹치지 않음.
+name: fraud-access-control
+
+services:
+  security-demo:
+    build: .
+    ports:
+      - "8030:8030"
+    # 데모 DB 를 호스트와 공유(재빌드 없이 데이터 교체 가능)
+    volumes:
+      - ./data:/app/data
+    restart: unless-stopped

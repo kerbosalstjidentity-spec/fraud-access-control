@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>3축 접근통제 데모</title>
+<style>
+  body { font-family: -apple-system, "Segoe UI", sans-serif; margin: 0; background: #f4f5f7; color: #222; }
+  header { background: #1f2937; color: #fff; padding: 16px 24px; }
+  header h1 { margin: 0; font-size: 18px; }
+  header p { margin: 4px 0 0; font-size: 13px; color: #9ca3af; }
+  .wrap { max-width: 900px; margin: 20px auto; padding: 0 16px; }
+  form { background: #fff; border-radius: 10px; padding: 16px 20px; box-shadow: 0 1px 3px rgba(0,0,0,.1); }
+  .row { display: flex; flex-wrap: wrap; gap: 14px; align-items: flex-end; }
+  .field { display: flex; flex-direction: column; gap: 4px; }
+  label { font-size: 12px; color: #6b7280; font-weight: 600; }
+  select, input[type=text] { padding: 7px 9px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 14px; }
+  button { background: #2563eb; color: #fff; border: 0; padding: 9px 18px; border-radius: 6px; font-size: 14px; cursor: pointer; }
+  .chk { flex-direction: row; align-items: center; gap: 6px; }
+  .card { background: #fff; border-radius: 10px; padding: 16px 20px; margin-top: 16px; box-shadow: 0 1px 3px rgba(0,0,0,.1); }
+  .badge { display: inline-block; padding: 4px 12px; border-radius: 999px; font-weight: 700; font-size: 14px; }
+  .permit { background: #dcfce7; color: #166534; }
+  .deny   { background: #fee2e2; color: #991b1b; }
+  .step_up{ background: #fef9c3; color: #854d0e; }
+  .meta { font-size: 13px; color: #4b5563; margin: 8px 0; }
+  .obl { display: inline-block; background: #eef2ff; color: #3730a3; border-radius: 5px; padding: 2px 8px; font-size: 12px; margin: 2px; }
+  pre { background: #0f172a; color: #e2e8f0; padding: 14px; border-radius: 8px; overflow: auto; font-size: 13px; }
+  .hint { font-size: 12px; color: #6b7280; margin-top: 6px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>🔐 사기판정 데이터 3축 접근통제 — 데모</h1>
+  <p>같은 case 라도 <b>누가(페르소나) · 무엇을(구역) · 어떻게(동작) · 어느 인증등급</b>으로 보느냐에 따라 다르게 노출됩니다.</p>
+</header>
+
+<div class="wrap">
+  <form method="get" action="/">
+    <div class="row">
+      <div class="field">
+        <label>페르소나 (누가)</label>
+        <select name="persona">
+          {% for v, lbl in personas %}
+          <option value="{{v}}" {% if v==sel.persona %}selected{% endif %}>{{lbl}}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="field">
+        <label>case_id</label>
+        <input type="text" name="case_id" value="{{sel.case_id}}" size="12">
+      </div>
+      <div class="field">
+        <label>구역 (무엇을)</label>
+        <select name="zone">
+          {% for v, lbl in zones %}
+          <option value="{{v}}" {% if v==sel.zone %}selected{% endif %}>{{lbl}}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="field">
+        <label>동작 (어떻게)</label>
+        <select name="verb">
+          {% for v in verbs %}
+          <option value="{{v}}" {% if v==sel.verb %}selected{% endif %}>{{v}}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="field">
+        <label>현재 인증등급</label>
+        <select name="level">
+          {% for n in levels %}
+          <option value="{{n}}" {% if n==sel.level %}selected{% endif %}>L{{n}}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="field chk">
+        <input type="checkbox" name="intruder" value="true" {% if sel.intruder %}checked{% endif %}>
+        <label>침입자(소유/배정 아님)</label>
+      </div>
+      <button type="submit">평가</button>
+    </div>
+    <div class="hint">💡 '현재 인증등급'을 낮추면 민감 동작에서 <b>step-up(OTP 필요)</b>이 발동합니다. (S4 미구현이라 등급은 수동 선택)</div>
+  </form>
+
+  {% if case is none %}
+  <div class="card"><b>case 를 찾을 수 없습니다.</b> case_id 를 확인하세요. (예: FC-000001)</div>
+  {% elif decision %}
+  <div class="card">
+    {% if decision.effect == "permit" %}
+      <span class="badge permit">✅ PERMIT</span>
+    {% elif decision.effect == "deny" %}
+      <span class="badge deny">⛔ DENY</span>
+    {% else %}
+      <span class="badge step_up">🔒 STEP-UP 필요 (L{{decision.required_level}})</span>
+    {% endif %}
+    <div class="meta">
+      <b>{{sel.persona}}</b> 가 <b>{{sel.case_id}}</b> 의 <b>{{decision.zone}}</b> 에 <b>{{decision.verb}}</b> 시도
+      &nbsp;·&nbsp; 요구 인증등급 <b>L{{decision.required_level}}</b> / 보유 <b>L{{sel.level}}</b>
+      <br>사유: {{decision.reason}}
+    </div>
+    {% if decision.obligations %}
+    <div class="meta">의무(obligations):
+      {% for o in decision.obligations %}<span class="obl">{{o}}</span>{% endfor %}
+    </div>
+    {% endif %}
+
+    {% if decision.effect == "permit" %}
+      <div class="meta">▼ S5 응답필터가 obligations 대로 가공한 실제 출력:</div>
+      <pre>{{result_json}}</pre>
+    {% elif decision.effect == "step_up" %}
+      <div class="meta">→ 데이터 반환 안 함. OTP step-up 으로 L{{decision.required_level}} 충족 후 재시도해야 함.</div>
+    {% else %}
+      <div class="meta">→ 기본 거부. 데이터가 필터까지 도달하지 못함.</div>
+    {% endif %}
+  </div>
+  {% endif %}
+</div>
+</body>
+</html>

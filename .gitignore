@@ -1,0 +1,16 @@
+# 데이터 (대용량 원본은 제외). 단, 데모 DB(fraud_case.db)는 배포 이미지에 필요 → 예외 추적
+archive/
+archive.zip
+/data/*
+!/data/fraud_case.db
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+.env
+
+# 기타
+.DS_Store
+.claude/
