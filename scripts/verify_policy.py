@@ -67,11 +67,25 @@ SCENARIOS = [
      princ(P.P3_MANAGER, level=P.L2), P.Z3, P.DECIDE, P.STEP_UP, P.L4),
 ]
 
+# 위험 적응형 가산 (D10) — 고위험 case(risk=0.85)에서만 평가
+HIGH_RISK_CTX = CaseContext(case_id="C-9999", owner_id=OWNER,
+                            assigned_to=INVESTIGATOR, risk_score=0.85)
+RISK_SCENARIOS = [
+    ("[가산] P2 Z2 unmask 고위험 → 기본 L3 +1 = L4",
+     princ(P.P2_INVESTIGATOR, INVESTIGATOR), P.Z2, P.UNMASK, P.PERMIT, P.L4),
+    ("[가산] P3 Z3 decide 고위험 → 이미 L4, 상한 유지",
+     princ(P.P3_MANAGER), P.Z3, P.DECIDE, P.PERMIT, P.L4),
+    ("[가산X] P2 Z1 view.full 고위험 → 비민감동작은 가산 안함 = L2",
+     princ(P.P2_INVESTIGATOR, INVESTIGATOR), P.Z1, P.VIEW_FULL, P.PERMIT, P.L2),
+    ("[가산] P2 Z2 unmask 고위험 + L3보유 → 가산 L4 미달이라 step_up(L4)",
+     princ(P.P2_INVESTIGATOR, INVESTIGATOR, level=P.L3), P.Z2, P.UNMASK, P.STEP_UP, P.L4),
+]
 
-def main() -> int:
+
+def _run(scenarios, ctx) -> tuple[int, int]:
     passed = failed = 0
-    for name, p, zone, verb, exp_effect, exp_level in SCENARIOS:
-        d = evaluate(p, zone, verb, CTX)
+    for name, p, zone, verb, exp_effect, exp_level in scenarios:
+        d = evaluate(p, zone, verb, ctx)
         ok = d.effect == exp_effect and (
             exp_effect == P.DENY or d.required_level == exp_level)
         tag = "PASS" if ok else "FAIL"
@@ -84,7 +98,14 @@ def main() -> int:
         print(f"       -> effect={d.effect} L{d.required_level} obs=[{obs}] ({d.reason})")
         if not ok:
             print(f"       !! expected effect={exp_effect} L{exp_level}")
+    return passed, failed
 
+
+def main() -> int:
+    p1, f1 = _run(SCENARIOS, CTX)
+    print("\n--- 위험 적응형 가산 (D10, risk=0.85) ---")
+    p2, f2 = _run(RISK_SCENARIOS, HIGH_RISK_CTX)
+    passed, failed = p1 + p2, f1 + f2
     print(f"\n총 {passed+failed}건: PASS {passed} / FAIL {failed}")
     return 0 if failed == 0 else 1
 

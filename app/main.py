@@ -71,7 +71,8 @@ def demo(
         if case is not None:
             owner = decrypt(case.cc_num_enc)        # 데모: 고객 식별자 = 카드번호
             ctx = CaseContext(case_id=case.case_id,
-                              owner_id=owner, assigned_to=case.assigned_to)
+                              owner_id=owner, assigned_to=case.assigned_to,
+                              risk_score=case.risk_score or 0.0)
             # 페르소나별 신원 부여 (intruder 면 일부러 권한 없는 신원)
             if persona == P.P1_CUSTOMER:
                 sid = "wrong-customer" if intruder else owner

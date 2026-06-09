@@ -96,6 +96,8 @@
     <div class="meta">
       <b>{{sel.persona}}</b> 가 <b>{{sel.case_id}}</b> 의 <b>{{decision.zone}}</b> 에 <b>{{decision.verb}}</b> 시도
       &nbsp;·&nbsp; 요구 인증등급 <b>L{{decision.required_level}}</b> / 보유 <b>L{{sel.level}}</b>
+      <br>이 case 위험도: <b>risk={{ "%.2f"|format(case.risk_score or 0) }}</b> · 판정 <b>{{case.decision}}</b>
+      {% if case.risk_score and case.risk_score >= 0.70 %}<span class="obl" style="background:#fee2e2;color:#991b1b">고위험 → 민감동작 인증 가산</span>{% endif %}
       <br>사유: {{decision.reason}}
     </div>
     {% if decision.obligations %}

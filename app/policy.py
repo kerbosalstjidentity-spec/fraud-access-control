@@ -74,6 +74,25 @@ POLICY: dict[tuple[str, str], dict[str, int]] = {
     (P5_EXTERNAL, Z1): {VIEW_MASKED: L1},
 }
 
+# ── 위험 적응형 가산 (결정 D10) ───────────────────────────────
+# 매트릭스가 정한 '기본' 요구등급 위에, 대상 case 가 고위험이면 **민감 동작에
+# 한해** 인증등급을 1단계 올린다 (floor=매트릭스, 절대 내리지 않음).
+# → risk_score 가 '보호 대상 데이터'이자 '인증 강도 가산 신호'로 쓰이는 지점.
+#   정적 매트릭스(≈RBAC) → 위험 인식(risk-adaptive) ABAC 로의 한 걸음.
+RISK_ADAPTIVE_VERBS: frozenset[str] = frozenset({UNMASK, DECIDE, EXPORT})
+RISK_ADAPTIVE_THRESHOLD = 0.70  # gen_judgment 의 BLOCK 임계(0.70)와 정렬
+
+
+def _adaptive_required(base: int, verb: str, risk_score: float) -> tuple[int, bool]:
+    """매트릭스 기본등급(base) → 고위험·민감동작이면 +1 (상한 L4).
+
+    반환 (요구등급, 가산여부). 비민감 동작이거나 저위험이면 base 그대로.
+    """
+    if verb in RISK_ADAPTIVE_VERBS and risk_score >= RISK_ADAPTIVE_THRESHOLD:
+        bumped = min(L4, base + 1)
+        return bumped, bumped > base
+    return base, False
+
 
 @dataclass
 class Principal:
@@ -94,6 +113,7 @@ class CaseContext:
     case_id: str
     owner_id: str = ""      # 이 case 당사자(고객) 식별자 — P1 소유 검사
     assigned_to: str = ""   # 배정 조사관 — P2 배정 검사
+    risk_score: float = 0.0  # 이 case 의 Z3 위험도 — 위험 적응형 가산(D10) 입력
 
 
 @dataclass
@@ -177,12 +197,15 @@ def evaluate(
         return Decision(DENY, L0, reason="ownership/assignment failed", **audit)
 
     required = cell[verb]
+    # 위험 적응형 가산 (D10) — 매트릭스 기본등급 위로만 올림(고위험·민감동작)
+    required, bumped = _adaptive_required(required, verb, ctx.risk_score)
     obligations = _build_obligations(zone, verb, required)
+    risk_note = f" · 위험가산+1(risk={ctx.risk_score:.2f})" if bumped else ""
 
     # ③ 인증 강도 충족? 미달이면 step-up 발동 (§4 ③)
     if principal.current_level < required:
         return Decision(STEP_UP, required, obligations,
-                        reason=f"step-up required L{required}", **audit)
+                        reason=f"step-up required L{required}{risk_note}", **audit)
 
     # 충족 → 허용 (§4 ④ 데이터 반환은 S5가 obligations 보고 집행)
-    return Decision(PERMIT, required, obligations, reason="permit", **audit)
+    return Decision(PERMIT, required, obligations, reason=f"permit{risk_note}", **audit)
